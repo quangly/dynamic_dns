@@ -1,7 +1,7 @@
 #!/bin/bash
 
 mydomain="yourdomain.com"
-myhostname="gateway"
+myhostname="@"
 gdapikey="API_KEY:KEY_SECRET"
 logdest="local7.info"
 
