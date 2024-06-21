@@ -1,7 +1,7 @@
 #!/bin/bash -xeu
 
-EMAIL=""
-ZONE_NAME=""  # https://dash.cloudflare.com/<account_id>/<zone>
+EMAIL="x@gmail.com"
+ZONE_NAME="x.com"  # https://dash.cloudflare.com/<account_id>/<zone>
 APIKEY=""     # https://dash.cloudflare.com/<account_id>/profile/api-tokens
 
 # Get the zone ID
@@ -48,13 +48,18 @@ else
   # Create JSON data
   DATA=$(cat <<EOF
 {
-  "id": "${RECORDID}",
-  "name": "${1}",
   "type": "${TYPE}",
-  "content": "${NEW_IP}"
+  "name": "${1}",
+  "content": "${NEW_IP}",
+  "ttl": 1,
+  "proxied": true
 }
 EOF
 )
+
+  # Log the data being sent
+  echo "Sending the following data to Cloudflare:"
+  echo "$DATA"
 
   # Make the PUT request
   RESPONSE=$(curl -s -f \
@@ -64,6 +69,7 @@ EOF
     -X PUT \
     "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORDID}")
 
-  # Print the response
+  # Log the response
+  echo "Response from Cloudflare:"
   echo "$RESPONSE"
 fi
