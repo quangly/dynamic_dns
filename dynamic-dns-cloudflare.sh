@@ -1,75 +1,59 @@
 #!/bin/bash -xeu
 
-EMAIL="x@gmail.com"
-ZONE_NAME="x.com"  # https://dash.cloudflare.com/<account_id>/<zone>
-APIKEY=""     # https://dash.cloudflare.com/<account_id>/profile/api-tokens
+# A bash script to update a Cloudflare DNS A record with the external IP of the source machine
+# Used to provide DDNS service for my home
+# Needs the DNS record pre-creating on Cloudflare
 
-# Get the zone ID
-ZONE_ID=$(curl -s -H "Authorization: Bearer ${APIKEY}" -H "Content-Type: application/json" \
-  "https://api.cloudflare.com/client/v4/zones?name=${ZONE_NAME}" | grep -o '"id":"[^"]*"' | head -n 1 | cut -d':' -f2 | tr -d '"')
+# Proxy - uncomment and provide details if using a proxy
+#export https_proxy=http://<proxyuser>:<proxypassword>@<proxyip>:<proxyport>
 
-# Ensure ZONE_ID was found
-if [ -z "$ZONE_ID" ]; then
-  echo "Zone ID not found."
-  exit 1
+# Cloudflare zone is the zone which holds the record such as example.com
+zone=example.com
+# dnsrecord is the A record which will be updated
+dnsrecord=example.com
+
+## Cloudflare authentication details
+## keep these private
+cloudflare_auth_email="YourCloudFlareEmailLogin"
+cloudflare_auth_key=""    #https://dash.cloudflare.com/<account_id>/profile/api-tokens
+
+
+
+# Get the current external IP address
+ip=$(curl -s -X GET https://checkip.amazonaws.com)
+
+echo "Current IP is $ip"
+
+if host $dnsrecord 1.1.1.1 | grep "has address" | grep "$ip"; then
+  echo "$dnsrecord is currently set to $ip; no changes needed"
+  exit
 fi
 
-# Get the current DNS record
-CURRENT_RECORD=$(curl -s -H "Authorization: Bearer ${APIKEY}" -H "Content-Type: application/json" \
-  "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?name=${1}")
+# if here, the dns record needs updating
 
-# Log the current record for debugging
-echo "Current Record: $CURRENT_RECORD"
+# get the zone id for the requested zone
+zoneid=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$zone&status=active" \
+  -H "Authorization: Bearer $cloudflare_auth_key" \
+  -H "Content-Type: application/json" | grep -o '"id":"[^"]*"' | sed 's/"id":"\([^"]*\)"/\1/' | head -n 1)
 
-# Extract the record ID
-RECORDID=$(echo "$CURRENT_RECORD" | grep -o '"id":"[^"]*"' | head -n 1 | cut -d':' -f2 | tr -d '"')
+echo "Zoneid for $zone is $zoneid"
 
-# Ensure RECORDID was found
-if [ -z "$RECORDID" ]; then
-  echo "Record ID not found."
-  exit 1
-fi
+# get the dns record id
+dnsrecordid=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zoneid/dns_records?type=A&name=$dnsrecord" \
+  -H "Authorization: Bearer $cloudflare_auth_key" \
+  -H "Content-Type: application/json" | grep -o '"id":"[^"]*"' | sed 's/"id":"\([^"]*\)"/\1/' | head -n 1)
 
-# Extract the current content IP
-CURRENT_IP=$(echo "$CURRENT_RECORD" | grep -o '"content":"[^"]*"' | head -n 1 | cut -d':' -f2 | tr -d '"')
+echo "DNSrecordid for $dnsrecord is $dnsrecordid"
 
-# Get the new IP
-NEW_IP=$(curl -s ipinfo.io/ip)
+echo "Bearer $cloudflare_auth_key"
 
-# Log if IP has changed or not
-if [ "$CURRENT_IP" == "$NEW_IP" ]; then
-  echo "IP has not changed. Current IP: $CURRENT_IP"
-else
-  echo "IP has changed from $CURRENT_IP to $NEW_IP"
+response=$(curl -s -w "%{http_code}" -X PUT "https://api.cloudflare.com/client/v4/zones/$zoneid/dns_records/$dnsrecordid" \
+  -H "Authorization: Bearer $cloudflare_auth_key" \
+  -H "Content-Type: application/json" \
+  --data "{\"type\":\"A\",\"name\":\"$dnsrecord\",\"content\":\"$ip\",\"ttl\":1,\"proxied\":false}")
 
-  # Set default type if not provided
-  TYPE=${2:-A}
+status_code=${response:(-3)}  # Get the last 3 characters (HTTP status code)
+response_body=${response:0:${#response}-3}  # Remove the status code from the response
 
-  # Create JSON data
-  DATA=$(cat <<EOF
-{
-  "type": "${TYPE}",
-  "name": "${1}",
-  "content": "${NEW_IP}",
-  "ttl": 1,
-  "proxied": true
-}
-EOF
-)
-
-  # Log the data being sent
-  echo "Sending the following data to Cloudflare:"
-  echo "$DATA"
-
-  # Make the PUT request
-  RESPONSE=$(curl -s -f \
-    --data "$DATA" \
-    -H "Authorization: Bearer ${APIKEY}" \
-    -H "Content-Type: application/json" \
-    -X PUT \
-    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORDID}")
-
-  # Log the response
-  echo "Response from Cloudflare:"
-  echo "$RESPONSE"
-fi
+echo "Status code: $status_code"
+echo "Response body: $response_body"
