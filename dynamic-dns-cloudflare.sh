@@ -36,14 +36,14 @@ zoneid=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$zone&s
   -H "Authorization: Bearer $cloudflare_auth_key" \
   -H "Content-Type: application/json" | grep -o '"id":"[^"]*"' | sed 's/"id":"\([^"]*\)"/\1/' | head -n 1)
 
-echo "Zoneid for $zone is $zoneid"
+echo "Zone Id for $zone is $zoneid"
 
 # get the dns record id
 dnsrecordid=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zoneid/dns_records?type=A&name=$dnsrecord" \
   -H "Authorization: Bearer $cloudflare_auth_key" \
   -H "Content-Type: application/json" | grep -o '"id":"[^"]*"' | sed 's/"id":"\([^"]*\)"/\1/' | head -n 1)
 
-echo "DNSrecordid for $dnsrecord is $dnsrecordid"
+echo "DNS RecordId for $dnsrecord is $dnsrecordid"
 
 echo "Bearer $cloudflare_auth_key"
 
