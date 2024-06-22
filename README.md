@@ -1,5 +1,5 @@
 # dynamic_dns
-Quick and Dirty Dynamic DNS Using GoDaddy and Cloudflare
+Quick and Dirty Dynamic DNS Using Cloudflare or GoDaddy
 
 # Cloudflare
 
